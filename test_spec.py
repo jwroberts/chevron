@@ -498,8 +498,35 @@ class ExpandedCoverage(unittest.TestCase):
         self.assertEqual(resultNone, expected)
         self.assertEqual(resultEmpty, expected)
         os.chdir('..')
+    
+    # https://github.com/noahmorrison/chevron/issues/93
+    def test_custom_warning(self):
+        def render_return_warnings(args):
+            warnings = []
+            def add_warning(warning):
+                warnings.append(warning)
 
-    # https://github.com/noahmorrison/chevron/pull/94
+            args['warn'] = add_warning
+
+            result = chevron.render(**args)
+            return (result, warnings)
+
+
+        args = {
+            'template': 'before, {{> with_missing_key }}, after',
+            'partials_dict': {
+                'with_missing_key': '{{#missing_key}}bloop{{/missing_key}}',
+            },
+        }
+
+        expected = 'before, , after'
+        (result, warnings) = render_return_warnings(args)
+
+        self.assertEqual(result, expected)
+        self.assertEqual(len(warnings), 1)
+        self.assertEqual(type(warnings[0]), chevron.ChevronKeyError)
+        self.assertEqual(warnings[0].msg, "Could not find key 'missing_key'\n")
+
     def test_keep(self):
         args = {
             'template': '{{ first }} {{ second }} {{ third }}',
@@ -551,7 +578,6 @@ class ExpandedCoverage(unittest.TestCase):
         result = chevron.render(**args)
         expected = '1st {{ missing_key }} 3rd'
         self.assertEqual(result, expected)
-
 
 # Run unit tests from command line
 if __name__ == "__main__":
